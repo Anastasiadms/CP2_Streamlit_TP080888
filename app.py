@@ -8,7 +8,7 @@ import hashlib
 import time
 import matplotlib.pyplot as plt
 
-# Setup for Blockchain
+# Blockchain Setup
 
 class Block:
     def __init__(self, index, timestamp, data, prev_hash):
@@ -43,20 +43,39 @@ class Blockchain:
 
 fraud_chain = Blockchain()
 
+# ----------------------------
+# Streamlit UI
+# ----------------------------
 
-# App Title
-
-
-st.title("Integrating Hybrid Model Fraud Detection with Blockchain for Detecting Online Payment Fraud")
-
-uploaded_file = st.file_uploader("Upload the transaction CSV", type=["csv"])
+st.title("🔍 Hybrid Fraud Detection with Blockchain & SHAP")
+uploaded_file = st.file_uploader("Upload transaction CSV", type=["csv"])
 
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
     st.write("### Uploaded Data", df.head())
 
+    # ----------------------------
+    # Feature Consistency Check
+    # ----------------------------
 
-    # Load the Hybrid Model and Params
+    expected_features = [
+        "step", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest",
+        "newbalanceDest", "type_code", "balance_diff", "log_amount",
+        "type_CASH_OUT", "type_DEBIT", "type_PAYMENT", "type_TRANSFER",
+        "dest_balance_diff", "zero_balance_orig", "zero_balance_dest",
+        "failedtransfer", "amount_to_balance_ratio", "high_value_flag"
+    ]
+
+    missing = [col for col in expected_features if col not in df.columns]
+    if missing:
+        st.error(f"❌ Missing columns in uploaded file: {missing}")
+        st.stop()
+
+    df = df[expected_features]  # Reorder
+
+    # ----------------------------
+    # Load Models and GA Params
+    # ----------------------------
 
     rf_model = joblib.load("rf_model.pkl")
     ocsvm_model = joblib.load("ocsvm_model.pkl")
@@ -66,7 +85,9 @@ if uploaded_file is not None:
     weights = hybrid_params["weights"]
     threshold = hybrid_params["threshold"]
 
-    # Prediction
+    # ----------------------------
+    # Hybrid Predictions
+    # ----------------------------
 
     rf_proba = rf_model.predict_proba(df)[:, 1]
     ocsvm_raw = ocsvm_model.predict(df)
@@ -76,36 +97,42 @@ if uploaded_file is not None:
     hybrid_preds = (hybrid_score > threshold).astype(int)
 
     df["predicted_fraud"] = hybrid_preds
-    st.write("### Predictions", df[["predicted_fraud"]].value_counts().rename("count"))
+    st.write("### Predictions Summary", df["predicted_fraud"].value_counts())
 
-    # SHAP Explanation
+    # ----------------------------
+    # SHAP Global Explanation
+    # ----------------------------
 
+    st.write("### SHAP Feature Importance (Top 10)")
     explainer = shap.TreeExplainer(rf_model)
     shap_values = explainer.shap_values(df)
 
-    st.write("### SHAP Feature Importance (Top 10)")
     fig, ax = plt.subplots()
     shap.summary_plot(shap_values[1], df, plot_type="bar", show=False)
     st.pyplot(fig)
 
-    # Force Plot (First Fraud)
+    # ----------------------------
+    # SHAP Force Plot for First Fraud
+    # ----------------------------
 
     frauds = df[df["predicted_fraud"] == 1]
     if not frauds.empty:
         idx = frauds.index[0]
         st.write("### SHAP Force Plot for First Predicted Fraud")
         shap.initjs()
-        st_shap = shap.force_plot(
+        force_plot = shap.force_plot(
             explainer.expected_value[1],
             shap_values[1][idx],
-            df.iloc[idx],
-            matplotlib=True,
+            df.loc[idx],
+            matplotlib=True
         )
-        st.pyplot(bbox_inches='tight')
+        st.pyplot(bbox_inches="tight")
     else:
-        st.info("No fraudulent transactions predicted.")
+        st.info("✅ No fraudulent transactions detected.")
 
+    # ----------------------------
     # Blockchain Logging
+    # ----------------------------
 
     st.write("### Blockchain Fraud Log")
     for idx, row in df[df["predicted_fraud"] == 1].iterrows():
