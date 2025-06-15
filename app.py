@@ -103,19 +103,27 @@ if uploaded_file is not None:
 # SHAP Explanation
 # ----------------------------
 
-# Step 1: Use only the original training features
-input_features = list(rf_model.feature_names_in_)
-df_features = df[input_features]
+# ----------------------------
+# SHAP Explanation (Fixed)
+# ----------------------------
 
-# Step 2: Initialize SHAP explainer and compute SHAP values
+# Step 1: Extract only columns used in training
+model_features = rf_model.feature_names_in_
+df_features = df.loc[:, model_features]
+
+# Step 2: Ensure df_features shape matches model input
+assert df_features.shape[1] == len(model_features), "Mismatch in features for SHAP"
+
+# Step 3: SHAP Explanation
 explainer = shap.TreeExplainer(rf_model)
 shap_values = explainer.shap_values(df_features)
 
-# Step 3: SHAP Summary Plot (Top Feature Importance)
+# Step 4: Summary Plot
 st.write("### SHAP Feature Importance (Top 10)")
 fig, ax = plt.subplots()
 shap.summary_plot(shap_values[1], df_features, plot_type="bar", show=False)
 st.pyplot(fig)
+
 
 # ----------------------------
 # SHAP Force Plot (First Predicted Fraud)
