@@ -99,36 +99,44 @@ if uploaded_file is not None:
     df["predicted_fraud"] = hybrid_preds
     st.write("### Predictions Summary", df["predicted_fraud"].value_counts())
 
-    # ----------------------------
-    # SHAP Global Explanation
-    # ----------------------------
+# ----------------------------
+# SHAP Explanation
+# ----------------------------
 
-    st.write("### SHAP Feature Importance (Top 10)")
-    explainer = shap.TreeExplainer(rf_model)
-    shap_values = explainer.shap_values(df)
+# Step 1: Use only the original training features
+input_features = list(rf_model.feature_names_in_)
+df_features = df[input_features]
 
-    fig, ax = plt.subplots()
-    shap.summary_plot(shap_values[1], pd.DataFrame(df, columns=rf_model.feature_names_in_), plot_type="bar", show=False)
-    st.pyplot(fig)
+# Step 2: Initialize SHAP explainer and compute SHAP values
+explainer = shap.TreeExplainer(rf_model)
+shap_values = explainer.shap_values(df_features)
 
-    # ----------------------------
-    # SHAP Force Plot for First Fraud
-    # ----------------------------
+# Step 3: SHAP Summary Plot (Top Feature Importance)
+st.write("### SHAP Feature Importance (Top 10)")
+fig, ax = plt.subplots()
+shap.summary_plot(shap_values[1], df_features, plot_type="bar", show=False)
+st.pyplot(fig)
 
-    frauds = df[df["predicted_fraud"] == 1]
-    if not frauds.empty:
-        idx = frauds.index[0]
-        st.write("### SHAP Force Plot for First Predicted Fraud")
-        shap.initjs()
-        force_plot = shap.force_plot(
-            explainer.expected_value[1],
-            shap_values[1][idx],
-            df.loc[idx],
-            matplotlib=True
-        )
-        st.pyplot(bbox_inches="tight")
-    else:
-        st.info("✅ No fraudulent transactions detected.")
+# ----------------------------
+# SHAP Force Plot (First Predicted Fraud)
+# ----------------------------
+
+frauds = df[df["predicted_fraud"] == 1]
+if not frauds.empty:
+    idx = frauds.index[0]
+    idx_local = df_features.index.get_loc(idx)
+
+    st.write("### SHAP Force Plot for First Predicted Fraud")
+    shap.initjs()
+    st_shap = shap.force_plot(
+        explainer.expected_value[1],
+        shap_values[1][idx_local],
+        df_features.iloc[idx_local],
+        matplotlib=True
+    )
+    st.pyplot(bbox_inches='tight')
+else:
+    st.info("No fraudulent transactions predicted.")
 
     # ----------------------------
     # Blockchain Logging
