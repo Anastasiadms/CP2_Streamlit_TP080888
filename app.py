@@ -47,7 +47,7 @@ fraud_chain = Blockchain()
 # Streamlit UI
 # ----------------------------
 
-st.title("🔍 Hybrid Fraud Detection with Blockchain & SHAP")
+st.title(" Hybrid Fraud Detection with Blockchain & SHAP")
 uploaded_file = st.file_uploader("Upload transaction CSV", type=["csv"])
 
 if uploaded_file is not None:
@@ -68,7 +68,7 @@ if uploaded_file is not None:
 
     missing = [col for col in expected_features if col not in df.columns]
     if missing:
-        st.error(f"❌ Missing columns in uploaded file: {missing}")
+        st.error(f" Missing columns in uploaded file: {missing}")
         st.stop()
 
     df = df[expected_features]  # Reorder
@@ -108,7 +108,7 @@ if uploaded_file is not None:
     shap_values = explainer.shap_values(df)
 
     fig, ax = plt.subplots()
-    shap.summary_plot(shap_values[1], df, plot_type="bar", show=False)
+    shap.summary_plot(shap_values[1], pd.DataFrame(df, columns=rf_model.feature_names_in_), plot_type="bar", show=False)
     st.pyplot(fig)
 
     # ----------------------------
